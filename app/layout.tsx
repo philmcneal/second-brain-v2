@@ -5,6 +5,8 @@ import "./globals.css";
 import { Sidebar } from "@/app/components/sidebar";
 import { CommandPalette } from "@/app/components/command-palette";
 import { HydrationGate } from "@/app/components/hydration-gate";
+import { ToastProvider } from "@/app/components/ui/toast";
+import { ConfirmDialog } from "@/app/components/ui/confirm-dialog";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +37,8 @@ export default function RootLayout({
             <main className="min-w-0 flex-1 p-6">{children}</main>
           </div>
           <CommandPalette />
+          <ToastProvider />
+          <ConfirmDialog />
         </HydrationGate>
       </body>
     </html>

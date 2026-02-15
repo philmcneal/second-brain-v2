@@ -6,7 +6,7 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
   return (
     <div
       className={cn(
-        "glass-card rounded-2xl transition-all duration-300",
+        "glass-card rounded-2xl transition-all duration-[var(--duration-medium)]",
         className,
       )}
       {...props}

@@ -115,7 +115,7 @@ export function CommandPalette(): React.JSX.Element {
     <>
       <button
         type="button"
-        className="fixed bottom-4 right-4 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300"
+        className="fixed bottom-4 right-4 rounded-md border border-[var(--glass-border)] bg-[var(--muted)] px-3 py-2 text-xs text-zinc-300"
         onClick={() => setOpen(true)}
       >
         Press Cmd/Ctrl + K
@@ -147,7 +147,7 @@ export function CommandPalette(): React.JSX.Element {
                     key={result.id}
                     href={result.href}
                     onClick={() => setOpen(false)}
-                    className="flex items-start justify-between rounded-md border border-zinc-800 bg-zinc-950 p-3 hover:bg-zinc-900"
+                    className="flex items-start justify-between rounded-md border border-[var(--glass-border)] bg-[var(--glass)] p-3 hover:bg-white/10"
                   >
                     <div className="flex min-w-0 gap-3">
                       <div className="mt-0.5 text-zinc-400">{icon}</div>

@@ -49,7 +49,7 @@ export default function DashboardPage(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <div className="animate-fade-in">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-zinc-400">Overview of memories, documents, and task progress.</p>
       </div>
 

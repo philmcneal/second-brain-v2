@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, ChevronLeft, ChevronRight, FileText, Home, Plus, SquareKanban } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { Button } from "@/app/components/ui/button";
 import { DataTransferControls } from "@/app/components/data-transfer-controls";
@@ -21,10 +21,23 @@ export function Sidebar(): React.JSX.Element {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
+  // Auto-collapse on mobile
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setCollapsed(true);
+      }
+    };
+
+    handleResize(); // Check on mount
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
     <aside
       className={cn(
-        "relative h-screen glass-card border-r border-[var(--glass-border)] p-3 transition-all duration-300 animate-slide-in-left",
+        "relative h-screen glass-card border-r border-[var(--glass-border)] p-3 transition-all duration-[var(--duration-medium)] animate-slide-in-left",
         collapsed ? "w-20" : "w-64",
       )}
     >
@@ -51,9 +64,9 @@ export function Sidebar(): React.JSX.Element {
               href={route.href}
               aria-label={route.label}
               className={cn(
-                "group flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-all duration-200",
+                "group flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-all duration-[var(--duration-normal)]",
                 active
-                  ? "border-white/15 bg-[linear-gradient(145deg,rgba(139,92,246,0.22),rgba(59,130,246,0.16))] text-zinc-50 shadow-[0_12px_32px_rgba(59,130,246,0.22)]"
+                  ? "border-white/15 bg-[linear-gradient(145deg,rgba(139,92,246,0.22),rgba(59,130,246,0.16))] text-zinc-50 shadow-[var(--shadow-lg)]"
                   : "border-transparent text-zinc-400 hover:border-white/10 hover:bg-white/10 hover:text-zinc-100",
               )}
               title={route.label}

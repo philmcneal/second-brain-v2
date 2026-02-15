@@ -5,14 +5,19 @@ import { format } from "date-fns";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Loader2 } from "lucide-react";
 
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
+import { Textarea } from "@/app/components/ui/textarea";
+import { Select } from "@/app/components/ui/select";
+import { FormField } from "@/app/components/ui/form-field";
 import { cn } from "@/app/lib/utils";
 import { useTasksStore } from "@/app/stores/tasks";
+import { toast } from "@/app/stores/toasts";
+import { confirm } from "@/app/stores/confirm";
 import type { Task } from "@/app/lib/types";
 
 const columns: Array<{ status: Task["status"]; label: string }> = [
@@ -88,7 +93,7 @@ function TaskCard({
   task: Task;
   onBack: () => void;
   onNext: () => void;
-  onDelete: () => void;
+  onDelete: () => Promise<void>;
 }): React.JSX.Element {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: taskId(task.id),
@@ -162,6 +167,8 @@ export default function TasksPage(): React.JSX.Element {
   const [priority, setPriority] = useState<Task["priority"]>("medium");
   const [dueDate, setDueDate] = useState("");
   const [tags, setTags] = useState("");
+  const [errors, setErrors] = useState<{ title?: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const grouped = useMemo(() => {
     return {
@@ -186,6 +193,8 @@ export default function TasksPage(): React.JSX.Element {
     const directColumnTarget = parseStatus(overId);
     if (directColumnTarget && currentTask.status !== directColumnTarget) {
       updateTask(draggedTaskId, { status: directColumnTarget });
+      const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
+      toast.success("Task moved", `Moved to ${statusLabels[directColumnTarget]}`);
       return;
     }
 
@@ -193,35 +202,60 @@ export default function TasksPage(): React.JSX.Element {
       const targetTask = tasks.find((task) => task.id === overId.replace("task-", ""));
       if (targetTask && targetTask.status !== currentTask.status) {
         updateTask(draggedTaskId, { status: targetTask.status });
+        const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
+        toast.success("Task moved", `Moved to ${statusLabels[targetTask.status]}`);
       }
     }
   };
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>): void => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
 
-    addTask({
-      title,
-      description,
-      priority,
-      dueDate: dueDate || undefined,
-      tags: tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-    });
+    // Validation
+    const newErrors: { title?: string } = {};
+    if (!title.trim()) {
+      newErrors.title = "Task title is required";
+    } else if (title.trim().length < 3) {
+      newErrors.title = "Task title must be at least 3 characters";
+    }
 
-    setTitle("");
-    setDescription("");
-    setPriority("medium");
-    setDueDate("");
-    setTags("");
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      addTask({
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        dueDate: dueDate || undefined,
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      });
+
+      toast.success("Task created", "Your task has been added to the board");
+
+      setTitle("");
+      setDescription("");
+      setPriority("medium");
+      setDueDate("");
+      setTags("");
+      setErrors({});
+    } catch {
+      toast.error("Failed to create task", "Please try again");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="animate-fade-in">
-        <h1 className="text-2xl font-semibold">Tasks</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Tasks</h1>
         <p className="text-sm text-zinc-400">Kanban workflow for focused execution.</p>
       </div>
 
@@ -231,27 +265,86 @@ export default function TasksPage(): React.JSX.Element {
           <CardDescription>Capture the task and move it through the board.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-3 md:grid-cols-2" onSubmit={onSubmit}>
-            <Input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Task title" />
-            <Input value={dueDate} onChange={(event) => setDueDate(event.target.value)} type="date" />
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              className="min-h-20 rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] px-3 py-2 text-sm text-zinc-100 backdrop-blur-md placeholder:text-zinc-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)]/60 focus-visible:border-[var(--accent-purple)]/50 focus-visible:shadow-[0_0_0_4px_rgba(59,130,246,0.14),0_0_24px_rgba(139,92,246,0.16)] md:col-span-2"
-              placeholder="Task details"
-            />
-            <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="Tags (comma separated)" />
-            <select
-              value={priority}
-              onChange={(event) => setPriority(event.target.value as Task["priority"])}
-              className="h-10 rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] px-3 text-sm text-zinc-100 backdrop-blur-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)]/60 focus-visible:border-[var(--accent-purple)]/50"
+          <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
+            <FormField
+              label="Task Title"
+              htmlFor="task-title"
+              required
+              error={errors.title}
+              className="md:col-span-2"
             >
-              <option value="low">Low priority</option>
-              <option value="medium">Medium priority</option>
-              <option value="high">High priority</option>
-            </select>
+              <Input
+                id="task-title"
+                value={title}
+                onChange={(event) => {
+                  setTitle(event.target.value);
+                  if (errors.title) setErrors({ ...errors, title: undefined });
+                }}
+                placeholder="What needs to be done?"
+              />
+            </FormField>
+
+            <FormField label="Due Date" htmlFor="task-due-date">
+              <Input
+                id="task-due-date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+                type="date"
+              />
+            </FormField>
+
+            <FormField label="Priority" htmlFor="task-priority">
+              <Select
+                id="task-priority"
+                value={priority}
+                onChange={(event) => setPriority(event.target.value as Task["priority"])}
+              >
+                <option value="low">Low priority</option>
+                <option value="medium">Medium priority</option>
+                <option value="high">High priority</option>
+              </Select>
+            </FormField>
+
+            <FormField
+              label="Description"
+              htmlFor="task-description"
+              helperText="Optional details about the task"
+              className="md:col-span-2"
+            >
+              <Textarea
+                id="task-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Add more details..."
+                className="min-h-20"
+              />
+            </FormField>
+
+            <FormField
+              label="Tags"
+              htmlFor="task-tags"
+              helperText="Comma separated (e.g., urgent, work, personal)"
+              className="md:col-span-2"
+            >
+              <Input
+                id="task-tags"
+                value={tags}
+                onChange={(event) => setTags(event.target.value)}
+                placeholder="work, urgent"
+              />
+            </FormField>
+
             <div className="md:col-span-2">
-              <Button type="submit">Add Task</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Add Task"
+                )}
+              </Button>
             </div>
           </form>
         </CardContent>
@@ -275,12 +368,45 @@ export default function TasksPage(): React.JSX.Element {
                     <TaskCard
                       key={task.id}
                       task={task}
-                      onBack={() => updateTask(task.id, { status: previousStatus(task.status) })}
-                      onNext={() => updateTask(task.id, { status: nextStatus(task.status) })}
-                      onDelete={() => deleteTask(task.id)}
+                      onBack={() => {
+                        updateTask(task.id, { status: previousStatus(task.status) });
+                        const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
+                        toast.success("Task moved", `Moved back to ${statusLabels[previousStatus(task.status)]}`);
+                      }}
+                      onNext={() => {
+                        updateTask(task.id, { status: nextStatus(task.status) });
+                        const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
+                        toast.success("Task moved", `Moved to ${statusLabels[nextStatus(task.status)]}`);
+                      }}
+                      onDelete={async () => {
+                        const confirmed = await confirm({
+                          title: "Delete Task",
+                          description: `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
+                          variant: "destructive",
+                          confirmLabel: "Delete",
+                        });
+
+                        if (confirmed) {
+                          deleteTask(task.id);
+                          toast.success("Task deleted", "The task has been removed");
+                        }
+                      }}
                     />
                   ))}
-                  {grouped[column.status].length === 0 ? <p className="text-xs text-zinc-500">No tasks yet</p> : null}
+                  {grouped[column.status].length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-zinc-500">
+                        {column.status === "todo" && "No pending tasks"}
+                        {column.status === "in-progress" && "No active tasks"}
+                        {column.status === "done" && "No completed tasks"}
+                      </p>
+                      <p className="text-xs text-zinc-600 mt-1">
+                        {column.status === "todo" && "Create a task to get started"}
+                        {column.status === "in-progress" && "Move tasks here to start working"}
+                        {column.status === "done" && "Mark tasks as done when complete"}
+                      </p>
+                    </div>
+                  ) : null}
                 </DroppableColumn>
               </SortableContext>
             </Card>
