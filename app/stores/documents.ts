@@ -22,6 +22,7 @@ interface DocumentsStore {
   documents: Document[];
   hasHydrated: boolean;
   setHasHydrated: (value: boolean) => void;
+  replaceDocuments: (documents: Partial<Document>[]) => void;
   addDocument: (input: AddDocumentInput) => void;
   updateDocument: (id: string, input: UpdateDocumentInput) => void;
   deleteDocument: (id: string) => void;
@@ -58,6 +59,11 @@ export const useDocumentsStore = create<DocumentsStore>()(
       documents: seedDocuments,
       hasHydrated: false,
       setHasHydrated: (value) => set({ hasHydrated: value }),
+      replaceDocuments: (documents) => {
+        set({
+          documents: Array.isArray(documents) ? documents.map((document) => normalizeDocument(document)) : [],
+        });
+      },
       addDocument: (input) => {
         const now = new Date().toISOString();
         set((state) => ({

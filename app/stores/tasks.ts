@@ -27,6 +27,7 @@ interface TasksStore {
   tasks: Task[];
   hasHydrated: boolean;
   setHasHydrated: (value: boolean) => void;
+  replaceTasks: (tasks: Partial<Task>[]) => void;
   addTask: (input: AddTaskInput) => void;
   updateTask: (id: string, input: UpdateTaskInput) => void;
   deleteTask: (id: string) => void;
@@ -69,6 +70,11 @@ export const useTasksStore = create<TasksStore>()(
       tasks: seedTasks,
       hasHydrated: false,
       setHasHydrated: (value) => set({ hasHydrated: value }),
+      replaceTasks: (tasks) => {
+        set({
+          tasks: Array.isArray(tasks) ? tasks.map((task) => normalizeTask(task)) : [],
+        });
+      },
       addTask: (input) => {
         set((state) => ({
           tasks: [

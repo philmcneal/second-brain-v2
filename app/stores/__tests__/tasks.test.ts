@@ -36,4 +36,11 @@ describe("useTasksStore", () => {
 
     uuidSpy.mockRestore();
   });
+
+  it("replaces tasks from imported payload", () => {
+    useTasksStore.getState().replaceTasks([{ id: "t-import", title: "Imported Task", description: "", priority: "low", status: "done", tags: [] }]);
+
+    expect(useTasksStore.getState().tasks).toHaveLength(1);
+    expect(useTasksStore.getState().tasks[0]?.status).toBe("done");
+  });
 });

@@ -36,4 +36,11 @@ describe("useMemoriesStore", () => {
 
     uuidSpy.mockRestore();
   });
+
+  it("replaces memories from imported payload", () => {
+    useMemoriesStore.getState().replaceMemories([{ id: "m-import", title: "Imported", content: "Body", tags: ["x"] }]);
+
+    expect(useMemoriesStore.getState().memories).toHaveLength(1);
+    expect(useMemoriesStore.getState().memories[0]?.title).toBe("Imported");
+  });
 });

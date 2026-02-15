@@ -34,4 +34,11 @@ describe("useDocumentsStore", () => {
 
     uuidSpy.mockRestore();
   });
+
+  it("replaces documents from imported payload", () => {
+    useDocumentsStore.getState().replaceDocuments([{ id: "d-import", name: "Imported Doc", path: "notes/imported.md", content: "hi" }]);
+
+    expect(useDocumentsStore.getState().documents).toHaveLength(1);
+    expect(useDocumentsStore.getState().documents[0]?.name).toBe("Imported Doc");
+  });
 });

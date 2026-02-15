@@ -22,6 +22,7 @@ interface MemoriesStore {
   memories: Memory[];
   hasHydrated: boolean;
   setHasHydrated: (value: boolean) => void;
+  replaceMemories: (memories: Partial<Memory>[]) => void;
   addMemory: (input: AddMemoryInput) => string;
   updateMemory: (id: string, input: UpdateMemoryInput) => void;
   deleteMemory: (id: string) => void;
@@ -58,6 +59,11 @@ export const useMemoriesStore = create<MemoriesStore>()(
       memories: seedMemories,
       hasHydrated: false,
       setHasHydrated: (value) => set({ hasHydrated: value }),
+      replaceMemories: (memories) => {
+        set({
+          memories: Array.isArray(memories) ? memories.map((memory) => normalizeMemory(memory)) : [],
+        });
+      },
       addMemory: (input) => {
         const now = new Date().toISOString();
         const id = crypto.randomUUID();

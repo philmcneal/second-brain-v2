@@ -6,6 +6,7 @@ import { BookOpen, ChevronLeft, ChevronRight, FileText, Home, Plus, SquareKanban
 import { useState } from "react";
 
 import { Button } from "@/app/components/ui/button";
+import { DataTransferControls } from "@/app/components/data-transfer-controls";
 import { cn } from "@/app/lib/utils";
 
 const routes = [
@@ -63,6 +64,8 @@ export function Sidebar(): React.JSX.Element {
           );
         })}
       </nav>
+
+      <DataTransferControls collapsed={collapsed} />
     </aside>
   );
 }
