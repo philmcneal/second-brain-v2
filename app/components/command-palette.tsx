@@ -19,6 +19,8 @@ type SearchResult = {
   subtitle: string;
   href: string;
   date: string;
+  searchableText: string;
+  score: number;
 };
 
 export function CommandPalette(): React.JSX.Element {
@@ -42,7 +44,8 @@ export function CommandPalette(): React.JSX.Element {
   }, []);
 
   const results = useMemo<SearchResult[]>(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalizedQuery = query.trim().toLowerCase();
+    const terms = normalizedQuery.split(/\s+/).filter(Boolean);
 
     const source: SearchResult[] = [
       ...memories.map((memory) => ({
@@ -52,14 +55,18 @@ export function CommandPalette(): React.JSX.Element {
         subtitle: memory.content,
         href: `/memories/${memory.id}`,
         date: memory.updatedAt,
+        searchableText: [memory.title, memory.content, ...memory.tags, "memory"].join(" ").toLowerCase(),
+        score: 0,
       })),
       ...tasks.map((task) => ({
         id: task.id,
         type: "task" as const,
         title: task.title,
-        subtitle: task.description,
+        subtitle: task.description || `${task.status} · ${task.priority}`,
         href: "/tasks",
         date: task.createdAt,
+        searchableText: [task.title, task.description, task.status, task.priority, ...task.tags, "task"].join(" ").toLowerCase(),
+        score: 0,
       })),
       ...documents.map((document) => ({
         id: document.id,
@@ -68,22 +75,40 @@ export function CommandPalette(): React.JSX.Element {
         subtitle: document.path,
         href: `/documents/${document.id}`,
         date: document.updatedAt,
+        searchableText: [document.name, document.path, document.content, "document"].join(" ").toLowerCase(),
+        score: 0,
       })),
     ];
 
-    const filtered = normalized
-      ? source.filter((item) => {
-          return (
-            item.title.toLowerCase().includes(normalized) ||
-            item.subtitle.toLowerCase().includes(normalized) ||
-            item.type.includes(normalized)
-          );
-        })
+    const filtered = terms.length
+      ? source
+          .map((item) => {
+            const title = item.title.toLowerCase();
+            const subtitle = item.subtitle.toLowerCase();
+            const type = item.type.toLowerCase();
+            let score = 0;
+            const matchesAllTerms = terms.every((term) => item.searchableText.includes(term));
+            if (!matchesAllTerms) return null;
+
+            for (const term of terms) {
+              if (title.includes(term)) score += 4;
+              if (subtitle.includes(term)) score += 2;
+              if (type.includes(term)) score += 1;
+            }
+
+            return { ...item, score };
+          })
+          .filter((item): item is SearchResult => item !== null)
       : source;
 
     return filtered
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 15);
+      .sort((a, b) => {
+        if (terms.length && b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      })
+      .slice(0, 20);
   }, [documents, memories, query, tasks]);
 
   return (

@@ -79,4 +79,19 @@ describe("CommandPalette", () => {
     expect(screen.getByText("Prepare Demo")).toBeInTheDocument();
     expect(screen.queryByText("Deep Work Notes")).not.toBeInTheDocument();
   });
+
+  it("matches across tags and document content", async () => {
+    const user = userEvent.setup();
+    render(<CommandPalette />);
+
+    await user.click(screen.getByRole("button", { name: "Press Cmd/Ctrl + K" }));
+
+    const input = screen.getByPlaceholderText("Find notes, tasks, docs...");
+    await user.type(input, "launch");
+    expect(screen.getByText("Prepare Demo")).toBeInTheDocument();
+
+    await user.clear(input);
+    await user.type(input, "system design");
+    expect(screen.getByText("Architecture")).toBeInTheDocument();
+  });
 });
