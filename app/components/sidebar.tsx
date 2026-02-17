@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, ChevronLeft, ChevronRight, FileText, Home, Plus, SquareKanban } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, FileText, Home, Plus, SquareKanban, Radio } from "lucide-react";
 import { useState, useEffect } from "react";
 
 import { Button } from "@/app/components/ui/button";
@@ -11,6 +11,7 @@ import { cn } from "@/app/lib/utils";
 
 const routes = [
   { href: "/", label: "Dashboard", icon: Home },
+  { href: "/mission-control", label: "Mission Control", icon: Radio },
   { href: "/memories", label: "Memories", icon: BookOpen },
   { href: "/memories/new", label: "New Memory", icon: Plus },
   { href: "/documents", label: "Documents", icon: FileText },

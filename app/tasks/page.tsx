@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { GripVertical, Loader2 } from "lucide-react";
+import { Bot, GripVertical, Loader2, RefreshCw, User } from "lucide-react";
 
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
@@ -89,11 +89,13 @@ function TaskCard({
   onBack,
   onNext,
   onDelete,
+  onReassign,
 }: {
   task: Task;
   onBack: () => void;
   onNext: () => void;
   onDelete: () => Promise<void>;
+  onReassign: () => void;
 }): React.JSX.Element {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: taskId(task.id),
@@ -117,6 +119,12 @@ function TaskCard({
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium text-zinc-100">{task.title}</p>
         <div className="flex items-center gap-1">
+          {task.assignee && (
+            <Badge className={task.assignee === "ai" ? "border-blue-400/30 bg-blue-500/12 text-blue-200" : "border-purple-400/30 bg-purple-500/12 text-purple-200"}>
+              {task.assignee === "ai" ? <Bot className="mr-1 h-3 w-3" /> : <User className="mr-1 h-3 w-3" />}
+              {task.assignee === "ai" ? "AI" : "Me"}
+            </Badge>
+          )}
           <Badge variant={priorityVariant(task.priority)}>{task.priority}</Badge>
           <button
             ref={setActivatorNodeRef}
@@ -148,6 +156,9 @@ function TaskCard({
             Next
           </Button>
         ) : null}
+        <Button size="sm" variant="ghost" onClick={onReassign} title="Reassign">
+          <RefreshCw className="mr-1 h-3 w-3" /> Reassign
+        </Button>
         <Button size="sm" variant="destructive" onClick={onDelete}>
           Delete
         </Button>
@@ -165,6 +176,7 @@ export default function TasksPage(): React.JSX.Element {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Task["priority"]>("medium");
+  const [assignee, setAssignee] = useState<Task["assignee"]>("user");
   const [dueDate, setDueDate] = useState("");
   const [tags, setTags] = useState("");
   const [errors, setErrors] = useState<{ title?: string }>({});
@@ -192,18 +204,24 @@ export default function TasksPage(): React.JSX.Element {
 
     const directColumnTarget = parseStatus(overId);
     if (directColumnTarget && currentTask.status !== directColumnTarget) {
-      updateTask(draggedTaskId, { status: directColumnTarget });
-      const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
-      toast.success("Task moved", `Moved to ${statusLabels[directColumnTarget]}`);
+      void updateTask(draggedTaskId, { status: directColumnTarget })
+        .then(() => {
+          const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
+          toast.success("Task moved", `Moved to ${statusLabels[directColumnTarget]}`);
+        })
+        .catch(() => toast.error("Task update failed", "Unable to move task"));
       return;
     }
 
     if (overId.startsWith("task-")) {
       const targetTask = tasks.find((task) => task.id === overId.replace("task-", ""));
       if (targetTask && targetTask.status !== currentTask.status) {
-        updateTask(draggedTaskId, { status: targetTask.status });
-        const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
-        toast.success("Task moved", `Moved to ${statusLabels[targetTask.status]}`);
+        void updateTask(draggedTaskId, { status: targetTask.status })
+          .then(() => {
+            const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
+            toast.success("Task moved", `Moved to ${statusLabels[targetTask.status]}`);
+          })
+          .catch(() => toast.error("Task update failed", "Unable to move task"));
       }
     }
   };
@@ -226,10 +244,11 @@ export default function TasksPage(): React.JSX.Element {
 
     setIsSubmitting(true);
     try {
-      addTask({
+      await addTask({
         title: title.trim(),
         description: description.trim(),
         priority,
+        assignee,
         dueDate: dueDate || undefined,
         tags: tags
           .split(",")
@@ -242,6 +261,7 @@ export default function TasksPage(): React.JSX.Element {
       setTitle("");
       setDescription("");
       setPriority("medium");
+      setAssignee("user");
       setDueDate("");
       setTags("");
       setErrors({});
@@ -303,6 +323,35 @@ export default function TasksPage(): React.JSX.Element {
                 <option value="medium">Medium priority</option>
                 <option value="high">High priority</option>
               </Select>
+            </FormField>
+
+            <FormField label="Assign To" htmlFor="task-assignee">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAssignee("user")}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all",
+                    assignee === "user"
+                      ? "border-purple-400/50 bg-purple-500/15 text-purple-200"
+                      : "border-[var(--glass-border)] bg-[var(--glass)] text-zinc-400 hover:border-white/15 hover:text-zinc-200",
+                  )}
+                >
+                  <User className="h-3.5 w-3.5" /> Me
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAssignee("ai")}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all",
+                    assignee === "ai"
+                      ? "border-blue-400/50 bg-blue-500/15 text-blue-200"
+                      : "border-[var(--glass-border)] bg-[var(--glass)] text-zinc-400 hover:border-white/15 hover:text-zinc-200",
+                  )}
+                >
+                  <Bot className="h-3.5 w-3.5" /> AI
+                </button>
+              </div>
             </FormField>
 
             <FormField
@@ -369,14 +418,28 @@ export default function TasksPage(): React.JSX.Element {
                       key={task.id}
                       task={task}
                       onBack={() => {
-                        updateTask(task.id, { status: previousStatus(task.status) });
-                        const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
-                        toast.success("Task moved", `Moved back to ${statusLabels[previousStatus(task.status)]}`);
+                        void updateTask(task.id, { status: previousStatus(task.status) })
+                          .then(() => {
+                            const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
+                            toast.success("Task moved", `Moved back to ${statusLabels[previousStatus(task.status)]}`);
+                          })
+                          .catch(() => toast.error("Task update failed", "Unable to move task"));
                       }}
                       onNext={() => {
-                        updateTask(task.id, { status: nextStatus(task.status) });
-                        const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
-                        toast.success("Task moved", `Moved to ${statusLabels[nextStatus(task.status)]}`);
+                        void updateTask(task.id, { status: nextStatus(task.status) })
+                          .then(() => {
+                            const statusLabels = { todo: "To Do", "in-progress": "In Progress", done: "Done" };
+                            toast.success("Task moved", `Moved to ${statusLabels[nextStatus(task.status)]}`);
+                          })
+                          .catch(() => toast.error("Task update failed", "Unable to move task"));
+                      }}
+                      onReassign={() => {
+                        const newAssignee = task.assignee === "ai" ? "user" : "ai";
+                        void updateTask(task.id, { assignee: newAssignee })
+                          .then(() => {
+                            toast.success("Task reassigned", `Reassigned to ${newAssignee === "ai" ? "AI" : "Me"}`);
+                          })
+                          .catch(() => toast.error("Task update failed", "Unable to reassign task"));
                       }}
                       onDelete={async () => {
                         const confirmed = await confirm({
@@ -387,8 +450,12 @@ export default function TasksPage(): React.JSX.Element {
                         });
 
                         if (confirmed) {
-                          deleteTask(task.id);
-                          toast.success("Task deleted", "The task has been removed");
+                          try {
+                            await deleteTask(task.id);
+                            toast.success("Task deleted", "The task has been removed");
+                          } catch {
+                            toast.error("Task deletion failed", "Unable to delete task");
+                          }
                         }
                       }}
                     />

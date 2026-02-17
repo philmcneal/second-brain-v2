@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Activity, BookOpen, FileText, SquareKanban, Folder, File, RefreshCw } from "lucide-react";
+import { Activity, BookOpen, ChevronLeft, ChevronRight, FileText, SquareKanban, Folder, File, RefreshCw } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
+import { TaskAssigneeWidget } from "@/app/components/task-assignee-widget";
 import { useMemoriesStore } from "@/app/stores/memories";
 import { useDocumentsStore } from "@/app/stores/documents";
 import { useTasksStore } from "@/app/stores/tasks";
@@ -27,6 +28,8 @@ export default function DashboardPage(): React.JSX.Element {
   const tasks = useTasksStore((state) => state.tasks);
   
   const { files, isLoading, lastRefresh, refreshFiles } = useFilesystemStore();
+  const [currentPage, setCurrentPage] = useState(1);
+  const FILES_PER_PAGE = 50;
 
   const items: ActivityItem[] = [
     ...memories.map((memory) => ({ id: memory.id, type: "memory" as const, title: memory.title, date: memory.updatedAt, href: `/memories/${memory.id}` })),
@@ -44,7 +47,11 @@ export default function DashboardPage(): React.JSX.Element {
     return () => stopFilesystemPolling();
   }, []);
 
-  const mdFiles = files.filter((f) => !f.isDirectory && f.name.endsWith(".md")).slice(0, 20);
+  // Pagination logic for markdown files
+  const allMdFiles = files.filter((f) => !f.isDirectory && f.name.endsWith(".md"));
+  const totalPages = Math.ceil(allMdFiles.length / FILES_PER_PAGE);
+  const startIndex = (currentPage - 1) * FILES_PER_PAGE;
+  const mdFiles = allMdFiles.slice(startIndex, startIndex + FILES_PER_PAGE);
 
   return (
     <div className="space-y-6">
@@ -84,6 +91,8 @@ export default function DashboardPage(): React.JSX.Element {
           </CardHeader>
         </Card>
       </div>
+
+      <TaskAssigneeWidget />
 
       <Card className="animate-fade-in-up">
         <CardHeader>
@@ -156,9 +165,35 @@ export default function DashboardPage(): React.JSX.Element {
             )}
           </div>
           {mdFiles.length > 0 && (
-            <p className="mt-2 text-xs text-zinc-500">
-              Showing {mdFiles.length} of {files.filter(f => !f.isDirectory && f.name.endsWith(".md")).length} markdown files
-            </p>
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-xs text-zinc-500">
+                Showing {startIndex + 1}-{Math.min(startIndex + FILES_PER_PAGE, allMdFiles.length)} of {allMdFiles.length} markdown files
+                {totalPages > 1 && ` • Page ${currentPage} of ${totalPages}`}
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-3 w-3" />
+                  </Button>
+                  <span className="text-xs text-zinc-400 min-w-[3rem] text-center">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

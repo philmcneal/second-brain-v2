@@ -1,7 +1,6 @@
 "use client";
 
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
 
 import { normalizeDate } from "@/app/lib/date-utils";
 import type { Task } from "@/app/lib/types";
@@ -10,6 +9,8 @@ interface AddTaskInput {
   title: string;
   description: string;
   priority: Task["priority"];
+  assignee?: Task["assignee"];
+  source?: Task["source"];
   dueDate?: string;
   tags: string[];
 }
@@ -19,6 +20,8 @@ interface UpdateTaskInput {
   description?: string;
   status?: Task["status"];
   priority?: Task["priority"];
+  assignee?: Task["assignee"];
+  source?: Task["source"];
   dueDate?: string;
   tags?: string[];
 }
@@ -26,104 +29,127 @@ interface UpdateTaskInput {
 interface TasksStore {
   tasks: Task[];
   hasHydrated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  lastRevision: string | null;
   setHasHydrated: (value: boolean) => void;
-  replaceTasks: (tasks: Partial<Task>[]) => void;
-  addTask: (input: AddTaskInput) => void;
-  updateTask: (id: string, input: UpdateTaskInput) => void;
-  deleteTask: (id: string) => void;
+  refreshTasks: () => Promise<void>;
+  replaceTasks: (tasks: Partial<Task>[]) => Promise<void>;
+  addTask: (input: AddTaskInput) => Promise<void>;
+  updateTask: (id: string, input: UpdateTaskInput) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
 }
 
-const seedNow = new Date().toISOString();
+const TASKS_ENDPOINT = "/api/tasks";
+const POLL_INTERVAL = 5000;
 
-const seedTasks: Task[] = [
-  {
-    id: "t-1",
-    title: "Plan weekly review",
-    description: "Block 30 minutes and summarize key learnings.",
-    status: "todo",
-    priority: "medium",
-    tags: ["planning"],
-    createdAt: seedNow,
+async function requestTasks(): Promise<{ tasks: Task[]; revision: string }> {
+  const response = await fetch(TASKS_ENDPOINT);
+  if (!response.ok) {
+    throw new Error("Failed to fetch tasks");
+  }
+  return response.json();
+}
+
+async function sendTaskRequest(method: string, body: unknown): Promise<void> {
+  const response = await fetch(TASKS_ENDPOINT, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const message = typeof data?.error === "string" ? data.error : "Task update failed";
+    throw new Error(message);
+  }
+}
+
+export const useTasksStore = create<TasksStore>()((set, get) => ({
+  tasks: [],
+  hasHydrated: false,
+  isLoading: false,
+  error: null,
+  lastRevision: null,
+  setHasHydrated: (value) => set({ hasHydrated: value }),
+  refreshTasks: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { tasks, revision } = await requestTasks();
+      if (revision !== get().lastRevision) {
+        set({ tasks, lastRevision: revision });
+      }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : "Unknown error" });
+    } finally {
+      set({ isLoading: false, hasHydrated: true });
+    }
   },
-];
+  replaceTasks: async (tasks) => {
+    const normalized = Array.isArray(tasks)
+      ? tasks.map((task) => ({
+          id: typeof task.id === "string" ? task.id : crypto.randomUUID(),
+          title: typeof task.title === "string" ? task.title : "Untitled Task",
+          description: typeof task.description === "string" ? task.description : "",
+          status: (task.status ?? "todo") as Task["status"],
+          priority: (task.priority ?? "low") as Task["priority"],
+          assignee: (task.assignee ?? null) as Task["assignee"],
+          source: (task.source ?? "manual") as Task["source"],
+          dueDate: normalizeDate(task.dueDate) ?? undefined,
+          tags: Array.isArray(task.tags) ? task.tags : [],
+          createdAt: normalizeDate(task.createdAt, new Date().toISOString()) ?? new Date().toISOString(),
+        }))
+      : [];
 
-function normalizeTask(task: Partial<Task>): Task {
-  const now = new Date().toISOString();
-  const statusValues: Task["status"][] = ["todo", "in-progress", "done"];
-  const priorityValues: Task["priority"][] = ["low", "medium", "high"];
+    await sendTaskRequest("PUT", { tasks: normalized });
+    await get().refreshTasks();
+  },
+  addTask: async (input) => {
+    await sendTaskRequest("POST", {
+      title: input.title,
+      description: input.description,
+      priority: input.priority,
+      assignee: input.assignee ?? "user",
+      source: input.source ?? "manual",
+      dueDate: input.dueDate,
+      tags: input.tags,
+    });
+    await get().refreshTasks();
+  },
+  updateTask: async (id, input) => {
+    await sendTaskRequest("PATCH", {
+      id,
+      title: input.title,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      assignee: input.assignee,
+      source: input.source,
+      dueDate: input.dueDate,
+      tags: input.tags,
+    });
+    await get().refreshTasks();
+  },
+  deleteTask: async (id) => {
+    await sendTaskRequest("DELETE", { id });
+    await get().refreshTasks();
+  },
+}));
 
-  return {
-    id: typeof task.id === "string" ? task.id : crypto.randomUUID(),
-    title: typeof task.title === "string" ? task.title : "Untitled Task",
-    description: typeof task.description === "string" ? task.description : "",
-    status: statusValues.includes(task.status as Task["status"]) ? (task.status as Task["status"]) : "todo",
-    priority: priorityValues.includes(task.priority as Task["priority"]) ? (task.priority as Task["priority"]) : "low",
-    dueDate: normalizeDate(task.dueDate),
-    tags: Array.isArray(task.tags) ? task.tags.filter((tag): tag is string => typeof tag === "string") : [],
-    createdAt: normalizeDate(task.createdAt, now) ?? now,
-  };
+let pollInterval: NodeJS.Timeout | null = null;
+
+export function startTasksPolling() {
+  if (pollInterval) return;
+  const store = useTasksStore.getState();
+  void store.refreshTasks();
+  pollInterval = setInterval(() => {
+    void useTasksStore.getState().refreshTasks();
+  }, POLL_INTERVAL);
 }
 
-export const useTasksStore = create<TasksStore>()(
-  persist(
-    (set) => ({
-      tasks: seedTasks,
-      hasHydrated: false,
-      setHasHydrated: (value) => set({ hasHydrated: value }),
-      replaceTasks: (tasks) => {
-        set({
-          tasks: Array.isArray(tasks) ? tasks.map((task) => normalizeTask(task)) : [],
-        });
-      },
-      addTask: (input) => {
-        set((state) => ({
-          tasks: [
-            {
-              id: crypto.randomUUID(),
-              title: input.title,
-              description: input.description,
-              status: "todo",
-              priority: input.priority,
-              dueDate: normalizeDate(input.dueDate),
-              tags: input.tags,
-              createdAt: new Date().toISOString(),
-            },
-            ...state.tasks,
-          ],
-        }));
-      },
-      updateTask: (id, input) => {
-        set((state) => ({
-          tasks: state.tasks.map((task) =>
-            task.id === id
-              ? {
-                  ...task,
-                  ...input,
-                  dueDate: input.dueDate === undefined ? task.dueDate : normalizeDate(input.dueDate),
-                }
-              : task,
-          ),
-        }));
-      },
-      deleteTask: (id) => {
-        set((state) => ({ tasks: state.tasks.filter((task) => task.id !== id) }));
-      },
-    }),
-    {
-      name: "second-brain-tasks",
-      version: 1,
-      storage: createJSONStorage(() => localStorage),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
-      },
-      migrate: (persistedState) => {
-        const state = persistedState as Partial<TasksStore>;
-        return {
-          ...state,
-          tasks: Array.isArray(state.tasks) ? state.tasks.map((task) => normalizeTask(task)) : seedTasks,
-          hasHydrated: false,
-        };
-      },
-    },
-  ),
-);
+export function stopTasksPolling() {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+}

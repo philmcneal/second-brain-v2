@@ -13,6 +13,8 @@ export interface Task {
   description: string;
   status: "todo" | "in-progress" | "done";
   priority: "low" | "medium" | "high";
+  assignee: "ai" | "user" | null;
+  source: "manual" | "ai-generated";
   dueDate?: string;
   tags: string[];
   createdAt: string;

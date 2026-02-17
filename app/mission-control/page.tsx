@@ -1,0 +1,394 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
+import { Bot, CheckCircle2, Circle, Clock, ExternalLink, FileText, Loader2, RefreshCw, User, AlertCircle, Pause } from "lucide-react";
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Badge } from "@/app/components/ui/badge";
+import { Button } from "@/app/components/ui/button";
+import { cn } from "@/app/lib/utils";
+
+interface TodoSection {
+  title: string;
+  emoji: string;
+  items: Array<{
+    text: string;
+    completed: boolean;
+  }>;
+}
+
+interface Commitment {
+  title: string;
+  status: "pending" | "in-progress" | "blocked" | "done";
+  eta?: string;
+  lastUpdate?: string;
+  description?: string;
+}
+
+interface MemoryFile {
+  name: string;
+  path: string;
+  size: number;
+  modifiedAt: string;
+  preview?: string;
+}
+
+export default function MissionControlPage(): React.JSX.Element {
+  const [todoSections, setTodoSections] = useState<TodoSection[]>([]);
+  const [activeCommitments, setActiveCommitments] = useState<Commitment[]>([]);
+  const [recentlyCompleted, setRecentlyCompleted] = useState<Commitment[]>([]);
+  const [memoryFiles, setMemoryFiles] = useState<MemoryFile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const [todoRes, commitmentsRes, memoryRes] = await Promise.all([
+        fetch("/api/mission-control/todo"),
+        fetch("/api/mission-control/commitments"),
+        fetch("/api/mission-control/memory-activity"),
+      ]);
+
+      if (!todoRes.ok || !commitmentsRes.ok || !memoryRes.ok) {
+        throw new Error("Failed to fetch mission control data");
+      }
+
+      const todoData = await todoRes.json();
+      const commitmentsData = await commitmentsRes.json();
+      const memoryData = await memoryRes.json();
+
+      setTodoSections(todoData.sections || []);
+      setActiveCommitments(commitmentsData.active || []);
+      setRecentlyCompleted(commitmentsData.recentlyCompleted || []);
+      setMemoryFiles(memoryData.files || []);
+      setLastRefresh(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const getStatusIcon = (status: Commitment["status"]) => {
+    switch (status) {
+      case "done":
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case "in-progress":
+        return <Clock className="h-4 w-4 text-blue-500" />;
+      case "blocked":
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
+      case "pending":
+        return <Pause className="h-4 w-4 text-yellow-500" />;
+      default:
+        return <Circle className="h-4 w-4 text-zinc-500" />;
+    }
+  };
+
+  const getStatusBadge = (status: Commitment["status"]) => {
+    const variants = {
+      done: "default",
+      "in-progress": "warning",
+      blocked: "danger",
+      pending: "default",
+    } as const;
+
+    return (
+      <Badge variant={variants[status]}>
+        {status.replace("-", " ")}
+      </Badge>
+    );
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  };
+
+  const openFile = (filePath: string) => {
+    // Convert full path to relative path for the workspace viewer
+    const relativePath = filePath.replace("/home/toilet/clawd/", "");
+    window.open(`/documents/workspace/${encodeURIComponent(relativePath)}`, "_blank");
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="animate-fade-in flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Mission Control Center</h1>
+          <p className="text-sm text-zinc-400">Unified dashboard for Vap3 and Chief's active work.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {lastRefresh && (
+            <span className="text-xs text-zinc-500">
+              Updated {formatDistanceToNow(lastRefresh, { addSuffix: true })}
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={isLoading}>
+            <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick Actions Panel */}
+      <Card className="animate-fade-in-up">
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common operations and shortcuts</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <Button
+              variant="secondary"
+              className="h-auto flex-col items-start p-4"
+              onClick={() => window.open("/memories/new", "_self")}
+            >
+              <span className="text-sm font-semibold">New Memory</span>
+              <span className="text-xs text-zinc-400 mt-1">Capture a new thought</span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-auto flex-col items-start p-4"
+              onClick={() => window.open("/tasks", "_self")}
+            >
+              <span className="text-sm font-semibold">Task Board</span>
+              <span className="text-xs text-zinc-400 mt-1">View Kanban board</span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-auto flex-col items-start p-4"
+              onClick={() => openFile("/home/toilet/clawd/TODO.md")}
+            >
+              <span className="text-sm font-semibold">Edit TODO.md</span>
+              <span className="text-xs text-zinc-400 mt-1">Update Vap3's tasks</span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-auto flex-col items-start p-4"
+              onClick={() => openFile("/home/toilet/clawd/COMMITMENTS.md")}
+            >
+              <span className="text-sm font-semibold">Edit COMMITMENTS.md</span>
+              <span className="text-xs text-zinc-400 mt-1">Update Chief's tasks</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {error && (
+        <Card className="border-red-500/50 bg-red-500/10">
+          <CardContent className="py-4">
+            <p className="text-sm text-red-200">Error: {error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Dual Task Streams */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Vap3's Tasks */}
+        <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.22),transparent_70%)]" />
+          <CardHeader className="relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-purple-400" />
+                <CardTitle>Vap3's Tasks</CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openFile("/home/toilet/clawd/TODO.md")}
+                title="Open TODO.md"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </div>
+            <CardDescription>From TODO.md</CardDescription>
+          </CardHeader>
+          <CardContent className="max-h-[500px] overflow-y-auto space-y-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+              </div>
+            ) : todoSections.length === 0 ? (
+              <p className="text-sm text-zinc-500 text-center py-8">No tasks found in TODO.md</p>
+            ) : (
+              todoSections.map((section, idx) => (
+                <div key={idx} className="space-y-2">
+                  <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+                    <span>{section.emoji}</span>
+                    <span>{section.title}</span>
+                    <Badge variant="default" className="ml-auto">
+                      {section.items.filter(i => !i.completed).length}/{section.items.length}
+                    </Badge>
+                  </h3>
+                  <div className="space-y-1 pl-4">
+                    {section.items.map((item, itemIdx) => (
+                      <div
+                        key={itemIdx}
+                        className={cn(
+                          "flex items-start gap-2 text-sm rounded px-2 py-1 transition-colors hover:bg-white/5",
+                          item.completed && "text-zinc-500 line-through"
+                        )}
+                      >
+                        {item.completed ? (
+                          <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-500 shrink-0" />
+                        ) : (
+                          <Circle className="h-4 w-4 mt-0.5 text-zinc-400 shrink-0" />
+                        )}
+                        <span>{item.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Chief's Tasks */}
+        <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_70%)]" />
+          <CardHeader className="relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-blue-400" />
+                <CardTitle>Chief's Tasks</CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openFile("/home/toilet/clawd/COMMITMENTS.md")}
+                title="Open COMMITMENTS.md"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </div>
+            <CardDescription>From COMMITMENTS.md</CardDescription>
+          </CardHeader>
+          <CardContent className="max-h-[500px] overflow-y-auto space-y-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+              </div>
+            ) : (
+              <>
+                {/* Active Commitments */}
+                {activeCommitments.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-zinc-200">Active</h3>
+                    {activeCommitments.map((commitment, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(commitment.status)}
+                            <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
+                          </div>
+                          {getStatusBadge(commitment.status)}
+                        </div>
+                        {commitment.description && (
+                          <p className="text-xs text-zinc-400 mt-2">{commitment.description}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-2 text-xs text-zinc-500">
+                          {commitment.eta && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              ETA: {commitment.eta}
+                            </span>
+                          )}
+                          {commitment.lastUpdate && (
+                            <span>Updated: {commitment.lastUpdate}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recently Completed */}
+                {recentlyCompleted.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-zinc-200">Recently Completed (Last 7 Days)</h3>
+                    {recentlyCompleted.map((commitment, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10 opacity-75"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
+                          </div>
+                          {commitment.lastUpdate && (
+                            <span className="text-xs text-zinc-500">{commitment.lastUpdate}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {activeCommitments.length === 0 && recentlyCompleted.length === 0 && (
+                  <p className="text-sm text-zinc-500 text-center py-8">No commitments found</p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Memory Activity Feed */}
+      <Card className="animate-fade-in-up">
+        <CardHeader>
+          <CardTitle className="inline-flex items-center gap-2">
+            <FileText className="h-4 w-4" /> Memory Activity Feed
+          </CardTitle>
+          <CardDescription>Recent memory files from /home/toilet/clawd/memory</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : memoryFiles.length === 0 ? (
+            <p className="text-sm text-zinc-500 text-center py-8">No memory files found</p>
+          ) : (
+            memoryFiles.map((file, idx) => (
+              <button
+                key={idx}
+                onClick={() => openFile(file.path)}
+                className="w-full text-left flex items-center justify-between rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] px-3 py-2 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <FileText className="h-4 w-4 text-zinc-500 shrink-0" />
+                    <p className="truncate text-sm text-zinc-100 font-medium">{file.name}</p>
+                    <span className="text-xs text-zinc-600">{formatFileSize(file.size)}</span>
+                  </div>
+                  {file.preview && (
+                    <p className="text-xs text-zinc-500 truncate">{file.preview}</p>
+                  )}
+                </div>
+                <span className="text-xs text-zinc-500 shrink-0 ml-4">
+                  {formatDistanceToNow(new Date(file.modifiedAt), { addSuffix: true })}
+                </span>
+              </button>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+    </div>
+  );
+}

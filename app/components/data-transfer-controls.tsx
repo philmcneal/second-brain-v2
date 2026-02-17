@@ -69,22 +69,26 @@ export function DataTransferControls({ collapsed }: DataTransferControlsProps): 
 
     const reader = new FileReader();
     reader.onload = () => {
-      try {
-        const parsed = JSON.parse(String(reader.result)) as ImportPayload;
-        const data = parsed.data;
-        if (!data || typeof data !== "object") {
-          throw new Error("Invalid payload shape");
+      const run = async (): Promise<void> => {
+        try {
+          const parsed = JSON.parse(String(reader.result)) as ImportPayload;
+          const data = parsed.data;
+          if (!data || typeof data !== "object") {
+            throw new Error("Invalid payload shape");
+          }
+
+          replaceMemories(Array.isArray(data.memories) ? data.memories : []);
+          await replaceTasks(Array.isArray(data.tasks) ? data.tasks : []);
+          replaceDocuments(Array.isArray(data.documents) ? data.documents : []);
+          setStatusMessage("Imported JSON data successfully.");
+        } catch {
+          setStatusMessage("Import failed: invalid JSON format.");
         }
 
-        replaceMemories(Array.isArray(data.memories) ? data.memories : []);
-        replaceTasks(Array.isArray(data.tasks) ? data.tasks : []);
-        replaceDocuments(Array.isArray(data.documents) ? data.documents : []);
-        setStatusMessage("Imported JSON data successfully.");
-      } catch {
-        setStatusMessage("Import failed: invalid JSON format.");
-      }
+        event.target.value = "";
+      };
 
-      event.target.value = "";
+      void run();
     };
 
     reader.readAsText(file);
