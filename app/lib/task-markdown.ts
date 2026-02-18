@@ -211,7 +211,7 @@ export function parseCommitmentsMarkdown(content: string, fallbackCreatedAt: str
 
     if (inCodeBlock) return;
 
-    const headerMatch = line.match(/^#{2,3}\s+(.+)/);
+    const headerMatch = line.match(/^###\s+(.+)/);
     if (headerMatch) {
       closeCurrent(index);
 
@@ -243,13 +243,17 @@ export function parseCommitmentsMarkdown(content: string, fallbackCreatedAt: str
 
     if (!current) return;
 
-    const statusMatch = line.match(/\*?\*?Status\*?\*?:\s*(pending|in-progress|blocked|done)/i);
+    // Field regexes handle both "**Field**:" and "**Field:**" formats.
+    // The latter (produced by buildCommitmentBlock) places the colon inside the bold
+    // markers, resulting in ":** " before the value — so we consume optional trailing
+    // asterisks after the colon with \*{0,2}.
+    const statusMatch = line.match(/\*?\*?Status\*?\*?:\*{0,2}\s*(pending|in-progress|blocked|done)/i);
     if (statusMatch) {
       current.task.status = mapCommitmentStatus(statusMatch[1]);
       return;
     }
 
-    const etaMatch = line.match(/\*?\*?ETA\*?\*?:\s*(.+)/i);
+    const etaMatch = line.match(/\*?\*?ETA\*?\*?:\*{0,2}\s*(.+)/i);
     if (etaMatch) {
       current.eta = etaMatch[1].trim();
       const dueDate = normalizeDate(etaMatch[1].trim());
@@ -257,19 +261,19 @@ export function parseCommitmentsMarkdown(content: string, fallbackCreatedAt: str
       return;
     }
 
-    const updateMatch = line.match(/\*?\*?Last Update\*?\*?:\s*(.+)/i);
+    const updateMatch = line.match(/\*?\*?Last Update\*?\*?:\*{0,2}\s*(.+)/i);
     if (updateMatch) {
       current.lastUpdate = updateMatch[1].trim();
       return;
     }
 
-    const subAgentMatch = line.match(/\*?\*?Sub-agent\*?\*?:\s*(.+)/i);
+    const subAgentMatch = line.match(/\*?\*?Sub-agent\*?\*?:\*{0,2}\s*(.+)/i);
     if (subAgentMatch) {
       current.subAgent = subAgentMatch[1].trim();
       return;
     }
 
-    const notesMatch = line.match(/\*?\*?Notes\*?\*?:\s*(.+)/i);
+    const notesMatch = line.match(/\*?\*?Notes\*?\*?:\*{0,2}\s*(.+)/i);
     if (notesMatch) {
       current.notes = notesMatch[1].trim();
       current.task.description = current.notes;
