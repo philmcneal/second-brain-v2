@@ -4,6 +4,12 @@ import { join } from "path";
 
 const WORKSPACE_ROOT = "/home/toilet/clawd";
 
+// Additional allowed roots for symlinked directories
+const ALLOWED_ROOTS = [
+  WORKSPACE_ROOT,
+  "/home/toilet/.openclaw/media", // Allow access to media via symlink
+];
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ path: string[] }> }
@@ -12,9 +18,11 @@ export async function GET(
     const { path } = await params;
     const filePath = join(WORKSPACE_ROOT, ...path);
     
-    // Security: ensure path is within workspace
+    // Security: ensure path is within allowed roots
     const resolvedPath = await fs.realpath(filePath);
-    if (!resolvedPath.startsWith(WORKSPACE_ROOT)) {
+    const isAllowed = ALLOWED_ROOTS.some(root => resolvedPath.startsWith(root));
+    
+    if (!isAllowed) {
       return NextResponse.json(
         { error: "Access denied" },
         { status: 403 }

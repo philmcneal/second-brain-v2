@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Bot, CheckCircle2, Circle, Clock, ExternalLink, FileText, Loader2, RefreshCw, User, AlertCircle, Pause } from "lucide-react";
+import { Bot, CheckCircle2, Circle, Clock, ExternalLink, FileText, Loader2, RefreshCw, User, AlertCircle, Pause, Settings } from "lucide-react";
+
+import { ConfigFileList } from "@/app/components/config-file-list";
+import { ConfigViewerModal } from "@/app/components/config-viewer-modal";
+import { ConfigOptimizerPanel } from "@/app/components/config-optimizer-panel";
+import type { ConfigFile, ConfigSuggestion } from "@/app/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
@@ -43,6 +48,13 @@ export default function MissionControlPage(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
+  // OpenClaw Config Optimizer state
+  const [configFiles, setConfigFiles] = useState<ConfigFile[]>([]);
+  const [configSuggestions, setConfigSuggestions] = useState<ConfigSuggestion[]>([]);
+  const [selectedConfigFile, setSelectedConfigFile] = useState<ConfigFile | null>(null);
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isConfigLoading, setIsConfigLoading] = useState(true);
+
   const fetchData = async () => {
     setIsLoading(true);
     setError(null);
@@ -74,8 +86,33 @@ export default function MissionControlPage(): React.JSX.Element {
     }
   };
 
+  const fetchConfigData = async () => {
+    setIsConfigLoading(true);
+    try {
+      const [filesRes, analysisRes] = await Promise.all([
+        fetch("/api/config-files"),
+        fetch("/api/config-analysis"),
+      ]);
+
+      if (filesRes.ok) {
+        const filesData = await filesRes.json();
+        setConfigFiles(filesData.files || []);
+      }
+
+      if (analysisRes.ok) {
+        const analysisData = await analysisRes.json();
+        setConfigSuggestions(analysisData.suggestions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch config data:", err);
+    } finally {
+      setIsConfigLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchConfigData();
   }, []);
 
   const getStatusIcon = (status: Commitment["status"]) => {
@@ -115,17 +152,25 @@ export default function MissionControlPage(): React.JSX.Element {
   };
 
   const openFile = (filePath: string) => {
-    // Convert full path to relative path for the workspace viewer
     const relativePath = filePath.replace("/home/toilet/clawd/", "");
     window.open(`/documents/workspace/${encodeURIComponent(relativePath)}`, "_blank");
   };
+
+  const handleConfigFileSelect = (file: ConfigFile) => {
+    setSelectedConfigFile(file);
+    setIsConfigModalOpen(true);
+  };
+
+  // Determine layout: if Chief has few tasks, show Memory Feed in right column to fill space
+  const chiefTaskCount = activeCommitments.length + recentlyCompleted.length;
+  const showMemoryInSidebar = chiefTaskCount < 3; // Show Memory Feed in right column if Chief has < 3 tasks
 
   return (
     <div className="space-y-6">
       <div className="animate-fade-in flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Mission Control Center</h1>
-          <p className="text-sm text-zinc-400">Unified dashboard for Vap3 and Chief's active work.</p>
+          <p className="text-sm text-zinc-400">Unified dashboard for Vap3 and Chief&apos;s active work.</p>
         </div>
         <div className="flex items-center gap-2">
           {lastRefresh && (
@@ -169,7 +214,7 @@ export default function MissionControlPage(): React.JSX.Element {
               onClick={() => openFile("/home/toilet/clawd/TODO.md")}
             >
               <span className="text-sm font-semibold">Edit TODO.md</span>
-              <span className="text-xs text-zinc-400 mt-1">Update Vap3's tasks</span>
+              <span className="text-xs text-zinc-400 mt-1">Update Vap3&apos;s tasks</span>
             </Button>
             <Button
               variant="secondary"
@@ -177,7 +222,7 @@ export default function MissionControlPage(): React.JSX.Element {
               onClick={() => openFile("/home/toilet/clawd/COMMITMENTS.md")}
             >
               <span className="text-sm font-semibold">Edit COMMITMENTS.md</span>
-              <span className="text-xs text-zinc-400 mt-1">Update Chief's tasks</span>
+              <span className="text-xs text-zinc-400 mt-1">Update Chief&apos;s tasks</span>
             </Button>
           </div>
         </CardContent>
@@ -191,16 +236,16 @@ export default function MissionControlPage(): React.JSX.Element {
         </Card>
       )}
 
-      {/* Dual Task Streams */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Vap3's Tasks */}
-        <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden">
+      {/* Main Content Grid - Smart layout that fills space */}
+      <div className="grid gap-4 lg:grid-cols-2 items-start">
+        {/* Left Column - Always Vap3&apos;s Tasks */}
+        <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden h-fit">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.22),transparent_70%)]" />
           <CardHeader className="relative">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <User className="h-5 w-5 text-purple-400" />
-                <CardTitle>Vap3's Tasks</CardTitle>
+                <CardTitle>Vap3&apos;s Tasks</CardTitle>
               </div>
               <Button
                 variant="ghost"
@@ -213,7 +258,7 @@ export default function MissionControlPage(): React.JSX.Element {
             </div>
             <CardDescription>From TODO.md</CardDescription>
           </CardHeader>
-          <CardContent className="max-h-[500px] overflow-y-auto space-y-4">
+          <CardContent className="max-h-[400px] overflow-y-auto space-y-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
@@ -254,140 +299,223 @@ export default function MissionControlPage(): React.JSX.Element {
           </CardContent>
         </Card>
 
-        {/* Chief's Tasks */}
-        <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_70%)]" />
-          <CardHeader className="relative">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-blue-400" />
-                <CardTitle>Chief's Tasks</CardTitle>
+        {/* Right Column - Chief's Tasks OR Memory Feed if Chief has few tasks */}
+        {showMemoryInSidebar ? (
+          <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden h-fit">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_70%)]" />
+            <CardHeader className="relative">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-blue-400" />
+                  <CardTitle>Chief&apos;s Tasks</CardTitle>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openFile("/home/toilet/clawd/COMMITMENTS.md")}
+                  title="Open COMMITMENTS.md"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => openFile("/home/toilet/clawd/COMMITMENTS.md")}
-                title="Open COMMITMENTS.md"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </div>
-            <CardDescription>From COMMITMENTS.md</CardDescription>
+              <CardDescription>From COMMITMENTS.md</CardDescription>
+            </CardHeader>
+            <CardContent className="max-h-[400px] overflow-y-auto space-y-4">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+                </div>
+              ) : (
+                <>
+                  {activeCommitments.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold text-zinc-200">Active</h3>
+                      {activeCommitments.map((commitment, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(commitment.status)}
+                              <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
+                            </div>
+                            {getStatusBadge(commitment.status)}
+                          </div>
+                          {commitment.description && (
+                            <p className="text-xs text-zinc-400 mt-2">{commitment.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2 text-xs text-zinc-500">
+                            {commitment.eta && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                ETA: {commitment.eta}
+                              </span>
+                            )}
+                            {commitment.lastUpdate && (
+                              <span>Updated: {commitment.lastUpdate}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {recentlyCompleted.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold text-zinc-200">Recently Completed (Last 7 Days)</h3>
+                      {recentlyCompleted.map((commitment, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10 opacity-75"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 text-green-500" />
+                              <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
+                            </div>
+                            {commitment.lastUpdate && (
+                              <span className="text-xs text-zinc-500">{commitment.lastUpdate}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {activeCommitments.length === 0 && recentlyCompleted.length === 0 && (
+                    <p className="text-sm text-zinc-500 text-center py-8">No commitments found</p>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="animate-fade-in-up">
+            <CardHeader>
+              <CardTitle className="inline-flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Memory Activity Feed
+              </CardTitle>
+              <CardDescription>Recent memory files from /home/toilet/clawd/memory</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+                </div>
+              ) : memoryFiles.length === 0 ? (
+                <p className="text-sm text-zinc-500 text-center py-8">No memory files found</p>
+              ) : (
+                memoryFiles.map((file, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => openFile(file.path)}
+                    className="w-full text-left flex items-center justify-between rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] px-3 py-2 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <FileText className="h-4 w-4 text-zinc-500 shrink-0" />
+                        <p className="truncate text-sm text-zinc-100 font-medium">{file.name}</p>
+                        <span className="text-xs text-zinc-600">{formatFileSize(file.size)}</span>
+                      </div>
+                      {file.preview && (
+                        <p className="text-xs text-zinc-500 truncate">{file.preview}</p>
+                      )}
+                    </div>
+                    <span className="text-xs text-zinc-500 shrink-0 ml-4">
+                      {formatDistanceToNow(new Date(file.modifiedAt), { addSuffix: true })}
+                    </span>
+                  </button>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Memory Activity Feed - Only show below when Chief has many tasks */}
+      {!showMemoryInSidebar && (
+        <Card className="animate-fade-in-up">
+          <CardHeader>
+            <CardTitle className="inline-flex items-center gap-2">
+              <FileText className="h-4 w-4" /> Memory Activity Feed
+            </CardTitle>
+            <CardDescription>Recent memory files from /home/toilet/clawd/memory</CardDescription>
           </CardHeader>
-          <CardContent className="max-h-[500px] overflow-y-auto space-y-4">
+          <CardContent className="space-y-2">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
               </div>
+            ) : memoryFiles.length === 0 ? (
+              <p className="text-sm text-zinc-500 text-center py-8">No memory files found</p>
             ) : (
-              <>
-                {/* Active Commitments */}
-                {activeCommitments.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-zinc-200">Active</h3>
-                    {activeCommitments.map((commitment, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(commitment.status)}
-                            <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
-                          </div>
-                          {getStatusBadge(commitment.status)}
-                        </div>
-                        {commitment.description && (
-                          <p className="text-xs text-zinc-400 mt-2">{commitment.description}</p>
-                        )}
-                        <div className="flex items-center gap-3 mt-2 text-xs text-zinc-500">
-                          {commitment.eta && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              ETA: {commitment.eta}
-                            </span>
-                          )}
-                          {commitment.lastUpdate && (
-                            <span>Updated: {commitment.lastUpdate}</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+              memoryFiles.map((file, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => openFile(file.path)}
+                  className="w-full text-left flex items-center justify-between rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] px-3 py-2 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <FileText className="h-4 w-4 text-zinc-500 shrink-0" />
+                      <p className="truncate text-sm text-zinc-100 font-medium">{file.name}</p>
+                      <span className="text-xs text-zinc-600">{formatFileSize(file.size)}</span>
+                    </div>
+                    {file.preview && (
+                      <p className="text-xs text-zinc-500 truncate">{file.preview}</p>
+                    )}
                   </div>
-                )}
-
-                {/* Recently Completed */}
-                {recentlyCompleted.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-zinc-200">Recently Completed (Last 7 Days)</h3>
-                    {recentlyCompleted.map((commitment, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10 opacity-75"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                            <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
-                          </div>
-                          {commitment.lastUpdate && (
-                            <span className="text-xs text-zinc-500">{commitment.lastUpdate}</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {activeCommitments.length === 0 && recentlyCompleted.length === 0 && (
-                  <p className="text-sm text-zinc-500 text-center py-8">No commitments found</p>
-                )}
-              </>
+                  <span className="text-xs text-zinc-500 shrink-0 ml-4">
+                    {formatDistanceToNow(new Date(file.modifiedAt), { addSuffix: true })}
+                  </span>
+                </button>
+              ))
             )}
           </CardContent>
         </Card>
-      </div>
+      )}
 
-      {/* Memory Activity Feed */}
-      <Card className="animate-fade-in-up">
-        <CardHeader>
-          <CardTitle className="inline-flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Memory Activity Feed
-          </CardTitle>
-          <CardDescription>Recent memory files from /home/toilet/clawd/memory</CardDescription>
+      {/* OpenClaw Config Optimizer Section */}
+      <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.15),transparent_70%)]" />
+        <CardHeader className="relative">
+          <div className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-purple-400" />
+            <CardTitle>OpenClaw Config Optimizer</CardTitle>
+          </div>
+          <CardDescription>
+            Manage and optimize SOUL.md, TOOLS.md, MEMORY.md, and other vital configuration files
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <h3 className="text-sm font-semibold text-zinc-200 mb-3">Configuration Files</h3>
+              <ConfigFileList
+                files={configFiles}
+                onSelect={handleConfigFileSelect}
+                loading={isConfigLoading}
+              />
             </div>
-          ) : memoryFiles.length === 0 ? (
-            <p className="text-sm text-zinc-500 text-center py-8">No memory files found</p>
-          ) : (
-            memoryFiles.map((file, idx) => (
-              <button
-                key={idx}
-                onClick={() => openFile(file.path)}
-                className="w-full text-left flex items-center justify-between rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] px-3 py-2 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <FileText className="h-4 w-4 text-zinc-500 shrink-0" />
-                    <p className="truncate text-sm text-zinc-100 font-medium">{file.name}</p>
-                    <span className="text-xs text-zinc-600">{formatFileSize(file.size)}</span>
-                  </div>
-                  {file.preview && (
-                    <p className="text-xs text-zinc-500 truncate">{file.preview}</p>
-                  )}
-                </div>
-                <span className="text-xs text-zinc-500 shrink-0 ml-4">
-                  {formatDistanceToNow(new Date(file.modifiedAt), { addSuffix: true })}
-                </span>
-              </button>
-            ))
-          )}
+            <div>
+              <ConfigOptimizerPanel
+                suggestions={configSuggestions}
+                loading={isConfigLoading}
+                onRefresh={fetchConfigData}
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      {/* Config File Viewer Modal */}
+      <ConfigViewerModal
+        file={selectedConfigFile}
+        open={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        onSaved={fetchConfigData}
+      />
 
     </div>
   );

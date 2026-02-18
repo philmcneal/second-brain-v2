@@ -301,7 +301,7 @@ export async function PUT(request: Request) {
 
     const todoLines = todoParsed.lines.filter((_, index) => !managedTodoLines.has(index));
 
-    let commitmentLines = [...commitmentsParsed.lines];
+    const commitmentLines = [...commitmentsParsed.lines];
     managedCommitmentBlocks
       .sort((a, b) => b.start - a.start)
       .forEach((block) => {

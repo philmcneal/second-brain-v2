@@ -28,3 +28,19 @@ export interface Document {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ConfigFile {
+  name: string;
+  path: string;
+  lastModified: string;
+  size: number;
+  exists: boolean;
+}
+
+export interface ConfigSuggestion {
+  id: string;
+  file: string;
+  title: string;
+  description: string;
+  priority: "high" | "medium" | "low";
+}

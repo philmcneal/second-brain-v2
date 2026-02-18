@@ -161,4 +161,51 @@ npm test                 # Run tests
 
 ---
 
-*Last updated: 2026-02-16 (post bidirectional sync + Mission Control)*
+## OpenClaw Config Optimizer (2026-02-17)
+
+New Mission Control section for managing OpenClaw configuration files.
+
+### Features
+- **Config Files Overview** — Grid view of all 6 vital config files (SOUL.md, TOOLS.md, MEMORY.md, AGENTS.md, USER.md, HEARTBEAT.md)
+- **File Viewer Modal** — Read-only markdown viewer with metadata
+- **Optimization Suggestions** — Heuristic-based analysis with priority levels
+
+### New Files
+- `app/api/config-files/route.ts` — List config files with metadata
+- `app/api/config-files/[filename]/route.ts` — GET/PUT individual files
+- `app/api/config-analysis/route.ts` — Analyze files, return suggestions
+- `app/components/config-file-list.tsx` — Config file grid component
+- `app/components/config-viewer-modal.tsx` — File viewer modal
+- `app/components/config-optimizer-panel.tsx` — Suggestions panel
+
+### API Routes
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/config-files` | GET | List all config files with size, modified time, exists status |
+| `/api/config-files/[filename]` | GET | Read file content |
+| `/api/config-files/[filename]` | PUT | Save file content |
+| `/api/config-analysis` | GET | Get optimization suggestions |
+
+### Types (added to `app/lib/types.ts`)
+```typescript
+export interface ConfigFile {
+  name: string;
+  path: string;
+  lastModified: string;
+  size: number;
+  exists: boolean;
+}
+
+export interface ConfigSuggestion {
+  id: string;
+  file: string;
+  title: string;
+  description: string;
+  priority: "high" | "medium" | "low";
+}
+```
+
+---
+
+*Last updated: 2026-02-17 (OpenClaw Config Optimizer added)*

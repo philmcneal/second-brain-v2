@@ -32,13 +32,26 @@ export async function GET() {
       if (inCodeBlock) continue;
 
       // Match commitment headers like "### Task Name" or "## Task Name"
+      // Skip section headers (like "## Active Commitments", "### Shipped Features Archive")
       const headerMatch = line.match(/^#{2,3}\s+(.+)/);
       if (headerMatch) {
+        const title = headerMatch[1];
+        // Skip section headers that aren't actual tasks
+        const sectionHeaders = [
+          "Active Commitments",
+          "Recently Completed",
+          "Shipped Features Archive",
+          "Format",
+        ];
+        if (sectionHeaders.some(h => title.includes(h))) {
+          continue;
+        }
+        
         if (currentCommitment) {
           commitments.push(currentCommitment);
         }
         currentCommitment = {
-          title: stripTaskMeta(headerMatch[1]),
+          title: stripTaskMeta(title),
           status: "pending",
         };
         continue;

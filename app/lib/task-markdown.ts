@@ -144,7 +144,7 @@ export function parseTodoMarkdown(content: string, fallbackCreatedAt: string): {
   });
 
   if (currentSection) {
-    currentSection.endIndex = lines.length;
+    (currentSection as TodoSection).endIndex = lines.length;
     sections.push(currentSection);
   }
 
@@ -175,7 +175,7 @@ function parseTimestampFromHeader(text: string): { timestamp?: string; title: st
   return { timestamp: `${dateToken} ${timeToken}`, title };
 }
 
-function toIsoFromTimestamp(timestamp?: string, fallback: string): string {
+function toIsoFromTimestamp(timestamp: string | undefined, fallback: string): string {
   if (!timestamp) return fallback;
   const parsed = new Date(timestamp.replace(" ", "T") + ":00Z");
   if (Number.isNaN(parsed.getTime())) return fallback;
