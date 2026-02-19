@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Bot, CheckCircle2, Circle, Clock, ExternalLink, FileText, Loader2, RefreshCw, User, AlertCircle, Pause, Settings } from "lucide-react";
+import { Bot, CheckCircle2, Circle, Clock, ExternalLink, Loader2, RefreshCw, User, AlertCircle, Pause, Settings } from "lucide-react";
 
 import { ConfigFileList } from "@/app/components/config-file-list";
 import { ConfigViewerModal } from "@/app/components/config-viewer-modal";
 import { ConfigOptimizerPanel } from "@/app/components/config-optimizer-panel";
+import { MemoryActivityFeed } from "@/app/components/memory-activity-feed";
 import type { ConfigFile, ConfigSuggestion } from "@/app/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
@@ -31,19 +32,10 @@ interface Commitment {
   description?: string;
 }
 
-interface MemoryFile {
-  name: string;
-  path: string;
-  size: number;
-  modifiedAt: string;
-  preview?: string;
-}
-
 export default function MissionControlPage(): React.JSX.Element {
   const [todoSections, setTodoSections] = useState<TodoSection[]>([]);
   const [activeCommitments, setActiveCommitments] = useState<Commitment[]>([]);
   const [recentlyCompleted, setRecentlyCompleted] = useState<Commitment[]>([]);
-  const [memoryFiles, setMemoryFiles] = useState<MemoryFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -60,24 +52,21 @@ export default function MissionControlPage(): React.JSX.Element {
     setError(null);
 
     try {
-      const [todoRes, commitmentsRes, memoryRes] = await Promise.all([
+      const [todoRes, commitmentsRes] = await Promise.all([
         fetch("/api/mission-control/todo"),
         fetch("/api/mission-control/commitments"),
-        fetch("/api/mission-control/memory-activity"),
       ]);
 
-      if (!todoRes.ok || !commitmentsRes.ok || !memoryRes.ok) {
+      if (!todoRes.ok || !commitmentsRes.ok) {
         throw new Error("Failed to fetch mission control data");
       }
 
       const todoData = await todoRes.json();
       const commitmentsData = await commitmentsRes.json();
-      const memoryData = await memoryRes.json();
 
       setTodoSections(todoData.sections || []);
       setActiveCommitments(commitmentsData.active || []);
       setRecentlyCompleted(commitmentsData.recentlyCompleted || []);
-      setMemoryFiles(memoryData.files || []);
       setLastRefresh(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -145,12 +134,6 @@ export default function MissionControlPage(): React.JSX.Element {
     );
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes}B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-  };
-
   const openFile = (filePath: string) => {
     const relativePath = filePath.replace("/home/toilet/clawd/", "");
     window.open(`/documents/workspace/${encodeURIComponent(relativePath)}`, "_blank");
@@ -160,10 +143,6 @@ export default function MissionControlPage(): React.JSX.Element {
     setSelectedConfigFile(file);
     setIsConfigModalOpen(true);
   };
-
-  // Determine layout: if Chief has few tasks, show Memory Feed in right column to fill space
-  const chiefTaskCount = activeCommitments.length + recentlyCompleted.length;
-  const showMemoryInSidebar = chiefTaskCount < 3; // Show Memory Feed in right column if Chief has < 3 tasks
 
   return (
     <div className="space-y-6">
@@ -236,9 +215,9 @@ export default function MissionControlPage(): React.JSX.Element {
         </Card>
       )}
 
-      {/* Main Content Grid - Smart layout that fills space */}
+      {/* Main Content Grid */}
       <div className="grid gap-4 lg:grid-cols-2 items-start">
-        {/* Left Column - Always Vap3&apos;s Tasks */}
+        {/* Left Column - Vap3's Tasks */}
         <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden h-fit">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.22),transparent_70%)]" />
           <CardHeader className="relative">
@@ -252,6 +231,7 @@ export default function MissionControlPage(): React.JSX.Element {
                 size="sm"
                 onClick={() => openFile("/home/toilet/clawd/TODO.md")}
                 title="Open TODO.md"
+                aria-label="Open TODO.md"
               >
                 <ExternalLink className="h-4 w-4" />
               </Button>
@@ -299,182 +279,113 @@ export default function MissionControlPage(): React.JSX.Element {
           </CardContent>
         </Card>
 
-        {/* Right Column - Chief's Tasks OR Memory Feed if Chief has few tasks */}
-        {showMemoryInSidebar ? (
-          <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden h-fit">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_70%)]" />
-            <CardHeader className="relative">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bot className="h-5 w-5 text-blue-400" />
-                  <CardTitle>Chief&apos;s Tasks</CardTitle>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => openFile("/home/toilet/clawd/COMMITMENTS.md")}
-                  title="Open COMMITMENTS.md"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
+        {/* Right Column - Chief's Tasks */}
+        <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden h-fit">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_70%)]" />
+          <CardHeader className="relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-blue-400" />
+                <CardTitle>Chief&apos;s Tasks</CardTitle>
               </div>
-              <CardDescription>From COMMITMENTS.md</CardDescription>
-            </CardHeader>
-            <CardContent className="max-h-[400px] overflow-y-auto space-y-4">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-                </div>
-              ) : (
-                <>
-                  {activeCommitments.length > 0 && (
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-zinc-200">Active</h3>
-                      {activeCommitments.map((commitment, idx) => (
-                        <div
-                          key={idx}
-                          className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <div className="flex items-center gap-2">
-                              {getStatusIcon(commitment.status)}
-                              <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
-                            </div>
-                            {getStatusBadge(commitment.status)}
-                          </div>
-                          {commitment.description && (
-                            <p className="text-xs text-zinc-400 mt-2">{commitment.description}</p>
-                          )}
-                          <div className="flex items-center gap-3 mt-2 text-xs text-zinc-500">
-                            {commitment.eta && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                ETA: {commitment.eta}
-                              </span>
-                            )}
-                            {commitment.lastUpdate && (
-                              <span>Updated: {commitment.lastUpdate}</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {recentlyCompleted.length > 0 && (
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-zinc-200">Recently Completed (Last 7 Days)</h3>
-                      {recentlyCompleted.map((commitment, idx) => (
-                        <div
-                          key={idx}
-                          className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10 opacity-75"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="h-4 w-4 text-green-500" />
-                              <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
-                            </div>
-                            {commitment.lastUpdate && (
-                              <span className="text-xs text-zinc-500">{commitment.lastUpdate}</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeCommitments.length === 0 && recentlyCompleted.length === 0 && (
-                    <p className="text-sm text-zinc-500 text-center py-8">No commitments found</p>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="animate-fade-in-up">
-            <CardHeader>
-              <CardTitle className="inline-flex items-center gap-2">
-                <FileText className="h-4 w-4" /> Memory Activity Feed
-              </CardTitle>
-              <CardDescription>Recent memory files from /home/toilet/clawd/memory</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-                </div>
-              ) : memoryFiles.length === 0 ? (
-                <p className="text-sm text-zinc-500 text-center py-8">No memory files found</p>
-              ) : (
-                memoryFiles.map((file, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => openFile(file.path)}
-                    className="w-full text-left flex items-center justify-between rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] px-3 py-2 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <FileText className="h-4 w-4 text-zinc-500 shrink-0" />
-                        <p className="truncate text-sm text-zinc-100 font-medium">{file.name}</p>
-                        <span className="text-xs text-zinc-600">{formatFileSize(file.size)}</span>
-                      </div>
-                      {file.preview && (
-                        <p className="text-xs text-zinc-500 truncate">{file.preview}</p>
-                      )}
-                    </div>
-                    <span className="text-xs text-zinc-500 shrink-0 ml-4">
-                      {formatDistanceToNow(new Date(file.modifiedAt), { addSuffix: true })}
-                    </span>
-                  </button>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Memory Activity Feed - Only show below when Chief has many tasks */}
-      {!showMemoryInSidebar && (
-        <Card className="animate-fade-in-up">
-          <CardHeader>
-            <CardTitle className="inline-flex items-center gap-2">
-              <FileText className="h-4 w-4" /> Memory Activity Feed
-            </CardTitle>
-            <CardDescription>Recent memory files from /home/toilet/clawd/memory</CardDescription>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openFile("/home/toilet/clawd/COMMITMENTS.md")}
+                title="Open COMMITMENTS.md"
+                aria-label="Open COMMITMENTS.md"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </div>
+            <CardDescription>From COMMITMENTS.md</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="max-h-[400px] overflow-y-auto space-y-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
               </div>
-            ) : memoryFiles.length === 0 ? (
-              <p className="text-sm text-zinc-500 text-center py-8">No memory files found</p>
             ) : (
-              memoryFiles.map((file, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => openFile(file.path)}
-                  className="w-full text-left flex items-center justify-between rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] px-3 py-2 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <FileText className="h-4 w-4 text-zinc-500 shrink-0" />
-                      <p className="truncate text-sm text-zinc-100 font-medium">{file.name}</p>
-                      <span className="text-xs text-zinc-600">{formatFileSize(file.size)}</span>
-                    </div>
-                    {file.preview && (
-                      <p className="text-xs text-zinc-500 truncate">{file.preview}</p>
-                    )}
+              <>
+                {activeCommitments.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-zinc-200">Active</h3>
+                    {activeCommitments.map((commitment, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(commitment.status)}
+                            <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
+                          </div>
+                          {getStatusBadge(commitment.status)}
+                        </div>
+                        {commitment.description && (
+                          <p className="text-xs text-zinc-400 mt-2">{commitment.description}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-2 text-xs text-zinc-500">
+                          {commitment.eta && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              ETA: {commitment.eta}
+                            </span>
+                          )}
+                          {commitment.lastUpdate && (
+                            <span>Updated: {commitment.lastUpdate}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <span className="text-xs text-zinc-500 shrink-0 ml-4">
-                    {formatDistanceToNow(new Date(file.modifiedAt), { addSuffix: true })}
-                  </span>
-                </button>
-              ))
+                )}
+
+                {recentlyCompleted.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-zinc-200">Recently Completed (Last 7 Days)</h3>
+                    {recentlyCompleted.map((commitment, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] p-3 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10 opacity-75"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            <p className="text-sm font-medium text-zinc-100">{commitment.title}</p>
+                          </div>
+                          {commitment.lastUpdate && (
+                            <span className="text-xs text-zinc-500">{commitment.lastUpdate}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {activeCommitments.length === 0 && recentlyCompleted.length === 0 && (
+                  <p className="text-sm text-zinc-500 text-center py-8">No commitments found</p>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
-      )}
+      </div>
+
+      {/* Memory Activity Feed — always visible, live-polling */}
+      <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.15),transparent_70%)]" />
+        <CardHeader className="relative">
+          <CardTitle>Memory Activity Feed</CardTitle>
+          <CardDescription>
+            Your second brain remembers what you forgot. Recent notes from{" "}
+            <code className="text-zinc-400">~/clawd/memory/</code> — live-updated every 5 seconds.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="max-h-[420px] overflow-y-auto">
+          <MemoryActivityFeed onOpenFile={openFile} />
+        </CardContent>
+      </Card>
 
       {/* OpenClaw Config Optimizer Section */}
       <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden">

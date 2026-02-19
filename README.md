@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 2nd Brain
+
+Personal knowledge management system — your digital second brain.
+
+## Features
+
+### Mission Control Center (`/mission-control`)
+
+Unified dashboard for tracking Vap3's and Chief's active work at a glance.
+
+- **Vap3's Tasks** — Reads from `TODO.md`; shows sections, completion status, and quick-open link.
+- **Chief's Tasks** — Reads from `COMMITMENTS.md`; shows active and recently completed commitments.
+- **Memory Activity Feed** — Live-updating list of the 10 most recently modified `.md` files from `~/clawd/memory/`. Auto-refreshes every 5 seconds with no manual intervention needed. Shows filename, file size, relative timestamp, and a plain-text preview. Click any entry to open the file in the workspace viewer.
+- **OpenClaw Config Optimizer** — View and edit vital config files (SOUL.md, TOOLS.md, etc.) with inline optimization suggestions.
+
+> **"Your second brain remembers what you forgot."**
+> The Memory Activity feed automatically surfaces your recent thoughts, notes, and daily logs — no digging through folders required.
+
+### Task Board (`/tasks`)
+
+Kanban-style drag-and-drop board. Tasks are stored in markdown files (`TODO.md` / `COMMITMENTS.md`) and sync bidirectionally with the Mission Control view.
+
+### Live Filesystem View
+
+Real-time view of the OpenClaw workspace at `~/clawd`. All markdown files are scanned and kept current via 5-second polling.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| State | Zustand |
+| UI Components | Radix UI |
+| Icons | Lucide React |
+| Dates | date-fns |
+| Drag & Drop | @dnd-kit |
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev              # localhost:3000
+npm run dev -- --hostname 0.0.0.0  # Network access
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint             # ESLint check
+npm test                 # Vitest unit tests
+npm run build            # Production build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## API Reference
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/mission-control/memory-activity` | GET | 10 most recent `.md` files in `~/clawd/memory/` with previews |
+| `/api/mission-control/todo` | GET | Parse TODO.md into sections |
+| `/api/mission-control/commitments` | GET | Parse COMMITMENTS.md into active/completed lists |
+| `/api/tasks` | GET/POST/PATCH/DELETE | Task CRUD (file-backed) |
+| `/api/files` | GET | List all markdown files in workspace |
+| `/api/file/[...path]` | GET | Read file content |
+| `/api/config-files` | GET | List OpenClaw config files |
+| `/api/config-files/[filename]` | GET/PUT | Read/write config file |
+| `/api/config-analysis` | GET | Config optimization suggestions |
