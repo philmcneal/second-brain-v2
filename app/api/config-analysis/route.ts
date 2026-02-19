@@ -19,7 +19,7 @@ const generateId = (): string => {
   return `suggestion-${Date.now()}-${suggestionIdCounter}`;
 };
 
-async function analyzeFile(fileName: string): Promise<ConfigSuggestion[]> {
+export async function analyzeFile(fileName: string): Promise<ConfigSuggestion[]> {
   const suggestions: ConfigSuggestion[] = [];
   const filePath = `${CONFIG_DIR}/${fileName}`;
 
