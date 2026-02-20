@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Bot, CheckCircle2, Circle, Clock, ExternalLink, Loader2, RefreshCw, User, AlertCircle, Pause, Settings } from "lucide-react";
+import { Bot, CheckCircle2, Circle, Clock, ExternalLink, Inbox, Loader2, RefreshCw, Tag, User, AlertCircle, Pause, Settings } from "lucide-react";
+
+import type { SlashCommandEntry } from "@/app/lib/types";
 
 import { ConfigFileList } from "@/app/components/config-file-list";
 import { ConfigViewerModal } from "@/app/components/config-viewer-modal";
@@ -32,6 +34,16 @@ interface Commitment {
   description?: string;
 }
 
+function SlashCommandBadge({ command }: { command: SlashCommandEntry["command"] }): React.JSX.Element {
+  const map: Record<SlashCommandEntry["command"], { variant: "success" | "danger" | "warning"; label: string }> = {
+    feature: { variant: "success", label: "/feature" },
+    bug: { variant: "danger", label: "/bug" },
+    marketing: { variant: "warning", label: "/marketing" },
+  };
+  const { variant, label } = map[command];
+  return <Badge variant={variant} className="shrink-0 mt-0.5">{label}</Badge>;
+}
+
 export default function MissionControlPage(): React.JSX.Element {
   const [todoSections, setTodoSections] = useState<TodoSection[]>([]);
   const [activeCommitments, setActiveCommitments] = useState<Commitment[]>([]);
@@ -39,6 +51,10 @@ export default function MissionControlPage(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  // Slash Command Inbox state
+  const [slashCommands, setSlashCommands] = useState<SlashCommandEntry[]>([]);
+  const [isSlashLoading, setIsSlashLoading] = useState(true);
 
   // OpenClaw Config Optimizer state
   const [configFiles, setConfigFiles] = useState<ConfigFile[]>([]);
@@ -99,9 +115,25 @@ export default function MissionControlPage(): React.JSX.Element {
     }
   };
 
+  const fetchSlashCommands = async () => {
+    setIsSlashLoading(true);
+    try {
+      const res = await fetch("/api/mission-control/slash-commands");
+      if (res.ok) {
+        const data = await res.json();
+        setSlashCommands(data.commands ?? []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch slash commands:", err);
+    } finally {
+      setIsSlashLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     fetchConfigData();
+    fetchSlashCommands();
   }, []);
 
   const getStatusIcon = (status: Commitment["status"]) => {
@@ -384,6 +416,66 @@ export default function MissionControlPage(): React.JSX.Element {
         </CardHeader>
         <CardContent className="max-h-[420px] overflow-y-auto">
           <MemoryActivityFeed onOpenFile={openFile} />
+        </CardContent>
+      </Card>
+
+      {/* Slash Command Inbox */}
+      <Card className="animate-fade-in-up glass-card-hover relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.18),transparent_70%)]" />
+        <CardHeader className="relative">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Inbox className="h-5 w-5 text-indigo-400" />
+              <CardTitle>Slash Command Inbox</CardTitle>
+            </div>
+            <Button variant="ghost" size="sm" onClick={fetchSlashCommands} disabled={isSlashLoading} aria-label="Refresh slash commands">
+              <RefreshCw className={cn("h-3 w-3", isSlashLoading && "animate-spin")} />
+            </Button>
+          </div>
+          <CardDescription>
+            Directives found in <code className="text-zinc-400">TODO.md</code> — use{" "}
+            <code className="text-zinc-400">/feature</code>,{" "}
+            <code className="text-zinc-400">/bug</code>, or{" "}
+            <code className="text-zinc-400">/marketing</code> (bare or{" "}
+            <code className="text-zinc-400">[bracketed]</code>) to queue ideas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="max-h-[360px] overflow-y-auto">
+          {isSlashLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : slashCommands.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <Inbox className="h-8 w-8 text-zinc-600" />
+              <p className="text-sm text-zinc-400 font-medium">No slash commands detected</p>
+              <p className="text-xs text-zinc-500 max-w-xs">
+                Add <code className="text-zinc-400">/feature</code>, <code className="text-zinc-400">/bug</code>, or{" "}
+                <code className="text-zinc-400">/marketing</code> directives to{" "}
+                <code className="text-zinc-400">TODO.md</code> to surface them here as a prioritized queue.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {slashCommands.map((entry, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-start gap-3 rounded-lg border border-[var(--glass-border)] bg-[var(--glass)] px-3 py-2.5 backdrop-blur-sm transition-all hover:border-white/15 hover:bg-white/10"
+                >
+                  <SlashCommandBadge command={entry.command} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-zinc-100 break-words">{entry.text}</p>
+                    {entry.section && (
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500">
+                        <Tag className="h-3 w-3 shrink-0" />
+                        {entry.section}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 

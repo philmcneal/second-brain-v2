@@ -1,102 +1,58 @@
 # 🎯 TONIGHT_FOCUS — Nightly PM Prioritization
 
-**Date:** 2026-02-19  
+**Date:** 2026-02-20  
 **Session:** Nightly Feature Development v2  
-**Selected Feature:** Memory Activity Feed for Mission Control
+**Selected Feature:** Slash Command Inbox for Mission Control
 
 ---
 
-## Selected: Memory Activity Feed Widget
+## Selected Feature
 
-### What It Is
-A live-updating widget on the Mission Control dashboard that displays the 10 most recent memory files from `/home/toilet/clawd/memory/`, with preview snippets and quick-open actions. Uses the existing `/api/files` and `/api/file/[path]` endpoints with 5-second polling.
+### Slash Command Inbox for Mission Control
+Add a new Mission Control widget that scans `TODO.md` for product-planning slash commands (`/feature`, `/bug`, `/marketing`, including bracketed forms like `[/feature]`) and surfaces them as a prioritized queue.
 
-### Why This One
+---
 
-**Impact Rationale:**
-- Users (Vap3) write memory files daily but have no visibility into recent entries without browsing the filesystem
-- Closes the loop on the 2nd Brain's "live filesystem integration" — currently the dashboard shows tasks, but not the thoughts/memories behind them
-- Enables quick pattern recognition: "What was I thinking about last week?"
+## Why This One (Impact Rationale)
 
-**Marketing Angle:**
-- Demo-friendly visual feature that shows the 2nd Brain is "alive" with your data
-- Highlights the unique live filesystem sync capability (not just another notes app)
-- Great screenshot for README/GitHub: "Your thoughts, automatically surfaced"
+- **Directly supports nightly automation flow:** The cron system now depends on slash-command-driven prioritization, but there is no in-app visibility for those commands yet.
+- **High user impact:** Gives Vap3 a fast way to see planning directives without manually grepping markdown.
+- **Quick win:** Can be built on existing file-reading patterns (`/api/mission-control/*`) with small-to-medium scope.
+- **Bridges PM + execution:** Keeps planning artifacts visible inside the same dashboard used for daily execution.
 
-**Estimated Scope:** Small (~2-3 hours)
-- API endpoints already exist and tested
-- UI pattern established (Mission Control cards)
-- No new dependencies needed
-- Reuses existing glassmorphism components
+---
+
+## Marketing Angle
+
+**"Turn plain markdown into an executable product queue."**
+
+Mission Control now auto-detects `/feature`, `/bug`, and `/marketing` directives from TODO.md so ideas become visible priorities immediately.
+
+---
+
+## Estimated Scope
+
+**Medium**
+
+- Add API route for slash command extraction
+- Add Mission Control widget with command cards + empty state
+- Add tests for parser/route
+- Update README with new capability
 
 ---
 
 ## Candidate Scoring
 
-| Feature | User Impact | Marketing Value | Quick Win | Total | Notes |
-|---------|-------------|-----------------|-----------|-------|-------|
-| **Memory Activity Feed** | 4/5 | 5/5 | 5/5 | **14** | ✅ Selected — builds on existing infrastructure |
-| Mission Control Widget Polish | 3/5 | 4/5 | 4/5 | 11 | Enhancements to existing dashboard |
-| Toiletland Spring Banner | 2/5 | 4/5 | 4/5 | 10 | Seasonal marketing asset |
-| Camel Scraper VoVo Analysis | 4/5 | 2/5 | 2/5 | 8 | Important but complex — needs invoice download + data correlation |
-| PartsHub Meetanshi Eval | 3/5 | 2/5 | 2/5 | 7 | Blocked until taxes complete |
-
-**Scoring Legend:**
-- User Impact: 1=niche, 5=core workflow improvement
-- Marketing Value: 1=internal only, 5=demo/showcase worthy
-- Quick Win: 1=multi-day, 5=tight scope, existing patterns
+| Candidate | User Impact | Marketing Value | Quick Win | Total | Notes |
+|---|---:|---:|---:|---:|---|
+| **Slash Command Inbox (selected)** | 5/5 | 5/5 | 4/5 | **14** | Supports cron v2 workflow and is demo-friendly |
+| Task Board Filters (assignee/priority) | 4/5 | 3/5 | 4/5 | 11 | Useful but less differentiated |
+| Mission Control Status Digest Card | 3/5 | 3/5 | 5/5 | 11 | Easy but lower strategic leverage |
 
 ---
 
-## Technical Notes
+## Phase-1 Notes
 
-**Files to Modify:**
-- `app/mission-control/page.tsx` — Add Memory Activity card/widget
-- May need: `app/api/memory-activity/route.ts` — Wrapper that returns last 10 .md files with snippets
-
-**API Status (from 2026-02-15 debug session):**
-- `/api/files` — Working, returns all files (may need filtering for `.md` only)
-- `/api/file/[path]` — Working, returns file content
-- Dev server: `npm run dev` on port 3000
-
-**Existing Components to Reuse:**
-- `Card`, `CardHeader`, `CardTitle`, `CardContent` — Glass card styling
-- `Badge` — For date tags
-- `Skeleton` — Loading states
-- `EmptyState` — No memories found
-
----
-
-## Context from Memory
-
-From `2026-02-15.md` — Claude Code debug session confirmed:
-> "The core functionality is working — the API serves files and the dashboard should show them."
-
-From `2026-02-16.md` — Mission Control Center shipped:
-> "Vap3's verdict: 'looks good i like it!'"
-
-The infrastructure is solid. This feature is a natural extension.
-
----
-
-## Success Criteria
-
-1. Widget displays 10 most recent `.md` files from `/home/toilet/clawd/memory/`
-2. Shows filename, modified date, and first 100 chars preview
-3. Click to open full file (reuse document viewer or new tab)
-4. Auto-refresh every 5 seconds
-5. Empty state when no memory files
-6. Responsive design (fits in Mission Control grid)
-
----
-
-## Marketing Copy (Draft)
-
-> **"Your second brain remembers what you forgot."**
-> 
-> The Memory Activity feed automatically surfaces your recent thoughts, notes, and daily logs — no digging through folders required.
-
----
-
-*Generated by PM Prioritization Sub-Agent (v2)*
-*Files analyzed: TODO.md, COMMITMENTS.md, memory/2026-02-12 through 2026-02-19*
+- `TODO.md` and `COMMITMENTS.md` were **not present in this repo path** (`/home/toilet/Projects/second-brain`).
+- Used workspace canonical files at `/home/toilet/clawd/TODO.md` and `/home/toilet/clawd/COMMITMENTS.md` for signal.
+- No explicit `[/feature]`, `[/bug]`, `[/marketing]` entries currently exist in TODO.md, which increases the value of adding visibility and discoverability in-app.

@@ -12,9 +12,13 @@ Unified dashboard for tracking Vap3's and Chief's active work at a glance.
 - **Chief's Tasks** — Reads from `COMMITMENTS.md`; shows active and recently completed commitments.
 - **Memory Activity Feed** — Live-updating list of the 10 most recently modified `.md` files from `~/clawd/memory/`. Auto-refreshes every 5 seconds with no manual intervention needed. Shows filename, file size, relative timestamp, and a plain-text preview. Click any entry to open the file in the workspace viewer.
 - **OpenClaw Config Optimizer** — View and edit vital config files (SOUL.md, TOOLS.md, etc.) with inline optimization suggestions.
+- **Slash Command Inbox** — Scans `TODO.md` for `/feature`, `/bug`, and `/marketing` directives (including bracketed `[/feature]` forms) and surfaces them as a prioritized queue with color-coded badges and section context.
 
 > **"Your second brain remembers what you forgot."**
 > The Memory Activity feed automatically surfaces your recent thoughts, notes, and daily logs — no digging through folders required.
+
+> **"Turn plain markdown into an executable product queue."**
+> Mission Control now auto-detects `/feature`, `/bug`, and `/marketing` directives from `TODO.md` so ideas become visible priorities immediately — no grep required.
 
 ### Task Board (`/tasks`)
 
@@ -56,6 +60,7 @@ npm run build            # Production build
 
 | Route | Method | Description |
 |-------|--------|-------------|
+| `/api/mission-control/slash-commands` | GET | Slash command entries (`/feature`, `/bug`, `/marketing`) parsed from `TODO.md` |
 | `/api/mission-control/memory-activity` | GET | 10 most recent `.md` files in `~/clawd/memory/` with previews |
 | `/api/mission-control/todo` | GET | Parse TODO.md into sections |
 | `/api/mission-control/commitments` | GET | Parse COMMITMENTS.md into active/completed lists |

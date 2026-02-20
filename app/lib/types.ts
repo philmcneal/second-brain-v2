@@ -44,3 +44,13 @@ export interface ConfigSuggestion {
   description: string;
   priority: "high" | "medium" | "low";
 }
+
+export interface SlashCommandEntry {
+  command: "feature" | "bug" | "marketing";
+  /** Full source line text (trimmed) containing the slash command. */
+  text: string;
+  /** Nearest `##` heading above this line, or null if none. */
+  section: string | null;
+  /** 0-based line index within the source file. */
+  lineIndex: number;
+}
